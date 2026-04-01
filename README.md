@@ -1,9 +1,9 @@
-# Agent Zero v1.2â€“v1.6 â€” Memory Extension Vulnerabilities Persist Across Versions
+# Agent Zero v1.2–v1.6 -- Memory Extension Vulnerabilities Persist Across Versions
 
 **Report Author:** MrTrench (CONTAK Production Environment)
 **Date:** 2026-04-01
 **Agent Zero Versions Tested:** v1.2, v1.6
-**Severity:** High â€” Message loop crash, service unavailability
+**Severity:** High -- Message loop crash, service unavailability
 **Repository:** [agent0ai/agent-zero](https://github.com/agent0ai/agent-zero)
 **Previous Report:** [Agent Zero NVIDIA Routing Fix (v1.2)](https://github.com/MrTrenchTrucker/agent-zero-nvidia-routing-fix)
 
@@ -36,7 +36,7 @@ Our v1.2 whitepaper (https://github.com/MrTrenchTrucker/agent-zero-nvidia-routin
 - We manually patched three files with `AuthenticationError` guards and increased `SEARCH_TIMEOUT` from 30s to 120s
 - We created a `ctx_init.sh` startup hook to persist patches across container restarts
 
-We expected v1.6 to incorporate fixes for these issues. It did not. The memory extension code is unchanged. Our production deployment has been running on our custom patches for the entire period â€” the upgrade to v1.6 simply swapped the application code while our persistent volume mounts preserved the patched extension files.
+We expected v1.6 to incorporate fixes for these issues. It did not. The memory extension code is unchanged. Our production deployment has been running on our custom patches for the entire period -- the upgrade to v1.6 simply swapped the application code while our persistent volume mounts preserved the patched extension files.
 
 ---
 
@@ -58,7 +58,7 @@ The files at `/git/agent-zero/plugins/_memory/` represent the stock code before 
 
 ---
 
-## 4. Comparison Results â€” Stock v1.2 vs Stock v1.6
+## 4. Comparison Results -- Stock v1.2 vs Stock v1.6
 
 ### `_50_recall_memories.py` (memory search and recall)
 
@@ -77,7 +77,7 @@ The files at `/git/agent-zero/plugins/_memory/` represent the stock code before 
 
 | Feature | Stock v1.2 | Stock v1.6 | Changed? |
 |---------|-----------|-----------|----------|
-| Error handling on `await task` | **None â€” bare await** | **None â€” bare await** | **No** |
+| Error handling on `await task` | **None -- bare await** | **None -- bare await** | **No** |
 | `asyncio.TimeoutError` catch | Not present | Not present | **No** |
 | `asyncio.CancelledError` catch | Not present | Not present | **No** |
 | General exception catch | Not present | Not present | **No** |
@@ -118,13 +118,13 @@ The files at `/git/agent-zero/plugins/_memory/` represent the stock code before 
 
 **Description:** None of the memory extension files that call `call_utility_model` import or catch `AuthenticationError` from litellm. When the utility model's `api_base` is misconfigured (empty string, wrong endpoint, or provider mismatch), every background memory operation floods with `AuthenticationError` exceptions.
 
-While the general `except Exception` blocks in some of these files do catch `AuthenticationError` as a subclass, they provide no specific handling â€” no diagnostic logging that identifies the API routing misconfiguration, no distinction between a transient failure and a persistent configuration error.
+While the general `except Exception` blocks in some of these files do catch `AuthenticationError` as a subclass, they provide no specific handling -- no diagnostic logging that identifies the API routing misconfiguration, no distinction between a transient failure and a persistent configuration error.
 
-**Impact:** With an empty `utility_model.api_base`, the agent generates hundreds of `AuthenticationError` exceptions per session. The generic exception handlers swallow them silently, and the agent operates without functional memory â€” no recall, no memorization, no solutions. The operator has no indication that memory is completely non-functional unless they inspect container logs.
+**Impact:** With an empty `utility_model.api_base`, the agent generates hundreds of `AuthenticationError` exceptions per session. The generic exception handlers swallow them silently, and the agent operates without functional memory -- no recall, no memorization, no solutions. The operator has no indication that memory is completely non-functional unless they inspect container logs.
 
 **Our patch (applied in v1.2, still running):** Added explicit `AuthenticationError` imports and catches with diagnostic logging that identifies the specific misconfiguration (e.g., NVIDIA API key sent to OpenAI endpoint). This allows operators to immediately identify and fix the routing issue.
 
-### Vulnerability 2: `_91_recall_wait.py` â€” Bare `await` Crashes Message Loop
+### Vulnerability 2: `_91_recall_wait.py` -- Bare `await` Crashes Message Loop
 
 **Affected file:** `_91_recall_wait.py`
 
@@ -137,7 +137,7 @@ await task
 
 The `_50_recall_memories.py` extension wraps its memory search in `asyncio.wait_for(timeout=SEARCH_TIMEOUT)`. When the timeout fires, the task is cancelled via `asyncio.CancelledError`. This `CancelledError` propagates through the bare `await task` in `_91_recall_wait.py`, up through the extension pipeline, and crashes the message loop.
 
-`CancelledError` is a `BaseException`, not an `Exception`. The general `except Exception` blocks elsewhere in the pipeline do not catch it. The crash is deterministic â€” every memory recall timeout guarantees it.
+`CancelledError` is a `BaseException`, not an `Exception`. The general `except Exception` blocks elsewhere in the pipeline do not catch it. The crash is deterministic -- every memory recall timeout guarantees it.
 
 **Impact:** The agent becomes completely unresponsive after any memory recall timeout. Recovery requires a chat reset or container restart. In production environments with remote API endpoints where timeouts are routine, this makes Agent Zero unusable for extended sessions.
 
@@ -147,7 +147,7 @@ The `_50_recall_memories.py` extension wraps its memory search in `asyncio.wait_
 
 **Affected file:** `_50_recall_memories.py`
 
-**Description:** The stock `SEARCH_TIMEOUT = 30` (seconds) is adequate for local inference servers but insufficient for remote API endpoints. Cloud-hosted LLM providers routinely take 15-45 seconds for utility model responses, especially under load. Combined with Vulnerability 2, the 30-second timeout creates a frequent crash cycle: timeout fires â†’ `CancelledError` â†’ message loop crash.
+**Description:** The stock `SEARCH_TIMEOUT = 30` (seconds) is adequate for local inference servers but insufficient for remote API endpoints. Cloud-hosted LLM providers routinely take 15-45 seconds for utility model responses, especially under load. Combined with Vulnerability 2, the 30-second timeout creates a frequent crash cycle: timeout fires → `CancelledError` → message loop crash.
 
 **Our patch (applied in v1.2):** Increased `SEARCH_TIMEOUT` from 30 to 120 seconds. This gives remote endpoints adequate time to respond while still providing a bounded wait that prevents indefinite hangs.
 
@@ -164,7 +164,7 @@ While the memory extensions are untouched, v1.6 did ship meaningful improvements
 - **v1.5:** WebSocket architecture rewrite, memory leak fixes, `a0_small` prompt set
 - **v1.6:** WhatsApp integration, **"Settings: API keys no longer overwritten on save"** (important fix for the model config persistence issue we documented in v1.2)
 
-The v1.6 settings fix is significant â€” in v1.2, saving any setting in the web UI would clobber API keys that had been entered separately. This was a pain point we documented. The v1.6 fix addresses it correctly.
+The v1.6 settings fix is significant -- in v1.2, saving any setting in the web UI would clobber API keys that had been entered separately. This was a pain point we documented. The v1.6 fix addresses it correctly.
 
 However, none of these improvements touch the memory extension pipeline.
 
@@ -192,13 +192,13 @@ The following patches have been running in our production deployment since the v
 - Add `AuthenticationError` catch on `call_utility_model` with diagnostic logging
 - Add general `except Exception` fallback after `AuthenticationError` catch (consistent with Patch 2)
 
-### Patch 4: `_91_recall_wait.py` (NEW â€” discovered during v1.6 testing)
+### Patch 4: `_91_recall_wait.py` (NEW -- discovered during v1.6 testing)
 
 - Import `asyncio`
 - Replace bare `await task` with try/except handling:
-  - `asyncio.TimeoutError` â†’ log warning, continue without memory
-  - `asyncio.CancelledError` â†’ log warning, continue without memory
-  - `Exception` â†’ log error, continue without memory
+  - `asyncio.TimeoutError` → log warning, continue without memory
+  - `asyncio.CancelledError` → log warning, continue without memory
+  - `Exception` → log error, continue without memory
 
 ---
 
@@ -208,13 +208,13 @@ The following patches have been running in our production deployment since the v
 
 Testing conducted on a containerized Agent Zero deployment with remote API endpoints (variable latency, 200ms+ round-trip times).
 
-### Before Any Patches (stock v1.2 and stock v1.6 â€” identical behavior)
+### Before Any Patches (stock v1.2 and stock v1.6 -- identical behavior)
 
 | Metric | Result |
 |--------|--------|
-| `AuthenticationError` on misconfigured `api_base` | Unhandled â€” floods logs, memory silently non-functional |
-| Memory recall timeout (30s) | `CancelledError` â†’ message loop crash |
-| Agent availability during timeout events | 0% â€” requires restart |
+| `AuthenticationError` on misconfigured `api_base` | Unhandled -- floods logs, memory silently non-functional |
+| Memory recall timeout (30s) | `CancelledError` → message loop crash |
+| Agent availability during timeout events | 0% -- requires restart |
 
 ### After Patches Applied
 
@@ -224,7 +224,7 @@ Testing conducted on a containerized Agent Zero deployment with remote API endpo
 | Memory recall timeout (120s) | Caught gracefully, agent continues without memory context |
 | New tracebacks during stress test | 0 |
 | Graceful catches logged | 22 |
-| Agent availability | 100% â€” no restarts required |
+| Agent availability | 100% -- no restarts required |
 | Task completion | All tasks completed normally |
 
 ### Stress Test Protocol
@@ -240,9 +240,9 @@ All operations completed. Failed memory operations logged as warnings. Agent con
 
 ---
 
-## 9. Corrected Code â€” Appendix
+## 9. Corrected Code -- Appendix
 
-### A. `_50_recall_memories.py` â€” AuthenticationError Guard + Timeout Increase
+### A. `_50_recall_memories.py` -- AuthenticationError Guard + Timeout Increase
 
 Add to imports:
 ```python
@@ -273,7 +273,7 @@ Add after `call_utility_model` in query prep section (wrap existing try/except):
                 query = ""
 ```
 
-### B. `_91_recall_wait.py` â€” Error Handling on Await
+### B. `_91_recall_wait.py` -- Error Handling on Await
 
 Add to imports:
 ```python
@@ -305,7 +305,7 @@ Replace bare `await task` with:
                 )
 ```
 
-### C. `_50_memorize_fragments.py` â€” AuthenticationError Guard
+### C. `_50_memorize_fragments.py` -- AuthenticationError Guard
 
 Add to imports:
 ```python
@@ -331,7 +331,7 @@ Add around `call_utility_model`:
                 return
 ```
 
-### D. `_51_memorize_solutions.py` â€” AuthenticationError Guard
+### D. `_51_memorize_solutions.py` -- AuthenticationError Guard
 
 Same pattern as Patch C applied to the solutions memorization `call_utility_model`.
 
