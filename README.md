@@ -1,4 +1,4 @@
-# Agent Zero v1.2–v1.6 -- Memory Extension Vulnerabilities Persist Across Versions
+# Agent Zero v1.2-v1.6 -- Memory Extension Vulnerabilities Persist Across Versions
 
 **Report Author:** MrTrench (CONTAK Production Environment)
 **Date:** 2026-04-01
@@ -147,7 +147,7 @@ The `_50_recall_memories.py` extension wraps its memory search in `asyncio.wait_
 
 **Affected file:** `_50_recall_memories.py`
 
-**Description:** The stock `SEARCH_TIMEOUT = 30` (seconds) is adequate for local inference servers but insufficient for remote API endpoints. Cloud-hosted LLM providers routinely take 15-45 seconds for utility model responses, especially under load. Combined with Vulnerability 2, the 30-second timeout creates a frequent crash cycle: timeout fires → `CancelledError` → message loop crash.
+**Description:** The stock `SEARCH_TIMEOUT = 30` (seconds) is adequate for local inference servers but insufficient for remote API endpoints. Cloud-hosted LLM providers routinely take 15-45 seconds for utility model responses, especially under load. Combined with Vulnerability 2, the 30-second timeout creates a frequent crash cycle: timeout fires -> `CancelledError` -> message loop crash.
 
 **Our patch (applied in v1.2):** Increased `SEARCH_TIMEOUT` from 30 to 120 seconds. This gives remote endpoints adequate time to respond while still providing a bounded wait that prevents indefinite hangs.
 
@@ -196,9 +196,9 @@ The following patches have been running in our production deployment since the v
 
 - Import `asyncio`
 - Replace bare `await task` with try/except handling:
-  - `asyncio.TimeoutError` → log warning, continue without memory
-  - `asyncio.CancelledError` → log warning, continue without memory
-  - `Exception` → log error, continue without memory
+  - `asyncio.TimeoutError` -> log warning, continue without memory
+  - `asyncio.CancelledError` -> log warning, continue without memory
+  - `Exception` -> log error, continue without memory
 
 ---
 
@@ -213,7 +213,7 @@ Testing conducted on a containerized Agent Zero deployment with remote API endpo
 | Metric | Result |
 |--------|--------|
 | `AuthenticationError` on misconfigured `api_base` | Unhandled -- floods logs, memory silently non-functional |
-| Memory recall timeout (30s) | `CancelledError` → message loop crash |
+| Memory recall timeout (30s) | `CancelledError` -> message loop crash |
 | Agent availability during timeout events | 0% -- requires restart |
 
 ### After Patches Applied
